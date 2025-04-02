@@ -1,38 +1,41 @@
-.App {
-  text-align: center;
+/* Ensure all cards are of equal height */
+.card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between; /* This will ensure content is evenly spaced */
+    height: 100%; /* Makes the cards take full height of their parent */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+.card:hover {
+    transform: translateY(-10px); /* Moves the card up */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Adds a shadow */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Optional: Set a specific height for all cards */
+.card {
+    min-height: 250px; /* Minimum height to ensure they are consistent */
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+.card .bi {
+    transition: transform 0.3s ease;
 }
 
-.App-link {
-  color: #61dafb;
+.card:hover .bi {
+    transform: scale(1.2); /* Scales the icon slightly */
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+/* Make sure the content inside the card is spaced out */
+.card .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+}
+body {
+    padding-top: 70px; /* Adjust this value to match the height of your navbar */
+}
+
+#featured-services {
+    padding-top: 70px; /* If you want to apply the padding to a specific section */
 }

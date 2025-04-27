@@ -1,608 +1,604 @@
 import React, { useState } from 'react';
-import { Form, Button, Container, Row, Col, Card, Modal } from 'react-bootstrap'; // Added Modal
 import axios from 'axios';
-import { URL } from '../domain.ts';
-import { useNavigate } from 'react-router-dom';
-import BlockContentUploader from './BlockContentUploader'; // Import the new component
+import { toast } from 'react-toastify';
+import HtmlEditor from './HtmlEditor';
+import {URL} from '../domain.ts';
 
-function CreateCourse() {
-    const navigate = useNavigate();
-    const [course, setCourse] = useState({
+const CreateCourse = () => {
+    const [loading, setLoading] = useState(false);
+    const [courseData, setCourseData] = useState({
         title: '',
-        urlVideo: '',
         briefDescription: '',
         description: '',
         price: 0,
         discount: false,
         priceWithDiscount: 0,
-        blocks: []
+        blocks: [
+            {
+                title: '',
+                numberOfBLock: 1,
+                test: {
+                    questions: []
+                },
+                lessons: []
+            }
+        ],
     });
 
-    // --- State for Upload Modal ---
-    const [showUploadModal, setShowUploadModal] = useState(false);
-    const [targetBlockIndex, setTargetBlockIndex] = useState(null);
-
-    // --- Modal Handlers ---
-    const handleShowUploadModal = (blockIndex) => {
-        setTargetBlockIndex(blockIndex);
-        setShowUploadModal(true);
-    };
-
-    const handleCloseUploadModal = () => {
-        setShowUploadModal(false);
-        setTargetBlockIndex(null);
-    };
-
-    // --- Callback for Upload Component ---
-    const handleContentUpload = (blockIndex, parsedLessons, parsedTest) => {
-        if (blockIndex === null || blockIndex < 0) return; // Safety check
-
-        setCourse(prev => {
-            const updatedBlocks = [...prev.blocks];
-            if (updatedBlocks[blockIndex]) {
-                // Merge lessons intelligently: Keep existing lessons if parsedLessons is empty?
-                // Or replace completely? Let's replace for simplicity now.
-                // If you want to ADD instead of replacing, adjust logic here.
-                updatedBlocks[blockIndex].lessons = parsedLessons || updatedBlocks[blockIndex].lessons;
-
-                // Update or add the test
-                // If parsedTest is null and a test existed, keep it? Or remove it?
-                // Current logic: If test file was uploaded, replace/add test. If not, keep existing.
-                if (parsedTest) {
-                    updatedBlocks[blockIndex].test = parsedTest;
-                } else if (parsedTest === null) {
-                    // Explicitly handle if no test file was chosen but one might exist
-                    // E.g., keep existing: do nothing here
-                    // E.g., remove existing if no test file uploaded: updatedBlocks[blockIndex].test = null;
-                    // Let's assume we only update the test if a test file was processed.
-                }
-            }
-            return { ...prev, blocks: updatedBlocks };
-        });
-        handleCloseUploadModal(); // Close modal after updating state
-        alert(`Содержимое для блока ${blockIndex + 1} обновлено!`);
-    };
-
-
-    // --- Existing State Handlers (handleChange, addBlock, etc.) ---
-    // (Keep all your existing handlers: handleChange, addBlock, updateBlockTitle,
-    // addLesson, updateLesson, toggleTest, addQuestion, updateQuestion, addAnswer, updateAnswer)
-    // ... (rest of your handlers from the original CreateCourse component) ...
-    const handleChange = (e) => {
+    // Handle changes to the main course data
+    const handleCourseChange = (e) => {
         const { name, value, type, checked } = e.target;
-        const val = type === 'checkbox' ? checked : (type === 'number' ? parseInt(value, 10) || 0 : value);
-        setCourse(prev => ({ ...prev, [name]: val }));
+        setCourseData({
+            ...courseData,
+            [name]: type === 'checkbox' ? checked :
+                type === 'number' ? parseFloat(value) : value
+        });
     };
 
+    // Handle changes to block data
+    const handleBlockChange = (blockIndex, e) => {
+        const { name, value } = e.target;
+        const updatedBlocks = [...courseData.blocks];
+        updatedBlocks[blockIndex] = { ...updatedBlocks[blockIndex], [name]: value };
+        setCourseData({ ...courseData, blocks: updatedBlocks });
+    };
+
+    // Add a new block
     const addBlock = () => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: [...prev.blocks, {
-                title: '',
-                numberOfBLock: prev.blocks.length,
-                lessons: [],
-                test: null // Изначально теста нет
-            }]
-        }));
+        const newBlock = {
+            title: '',
+            numberOfBLock: courseData.blocks.length + 1,
+            test: {
+                questions: []
+            },
+            lessons: []
+        };
+
+        setCourseData({
+            ...courseData,
+            blocks: [...courseData.blocks, newBlock]
+        });
     };
 
-    const updateBlockTitle = (index, value) => {
-        const updatedBlocks = [...course.blocks];
-        updatedBlocks[index].title = value;
-        updatedBlocks[index].numberOfBLock = index; // Обновляем номер блока
-        setCourse(prev => ({ ...prev, blocks: updatedBlocks }));
+    // Remove a block
+    const removeBlock = (blockIndex) => {
+        if (courseData.blocks.length > 1) {
+            const updatedBlocks = courseData.blocks.filter((_, idx) => idx !== blockIndex);
+            updatedBlocks.forEach((block, idx) => block.numberOfBLock = idx + 1);
+            setCourseData({ ...courseData, blocks: updatedBlocks });
+        } else {
+            toast.error('Курс должен содержать как минимум один блок');
+        }
     };
 
-    const addLesson = (blockIndex) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex) {
-                    return {
-                        ...block,
-                        lessons: [...block.lessons, {
-                            title: '',
-                            briefDescription: '',
-                            description: '',
-                            urlVideo: '',
-                            experience: 0
-                        }]
-                    };
-                }
-                return block;
-            })
-        }));
+    // Check if block has test questions
+    const hasTestQuestions = (blockIndex) => {
+        return courseData.blocks[blockIndex].test &&
+            courseData.blocks[blockIndex].test.questions &&
+            courseData.blocks[blockIndex].test.questions.length > 0;
     };
 
-    const updateLesson = (blockIndex, lessonIndex, field, value) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex) {
-                    return {
-                        ...block,
-                        lessons: block.lessons.map((lesson, lIdx) => {
-                            if (lIdx === lessonIndex) {
-                                return {
-                                    ...lesson,
-                                    [field]: field === 'experience' ? parseInt(value, 10) || 0 : value
-                                };
-                            }
-                            return lesson;
-                        })
-                    };
-                }
-                return block;
-            })
-        }));
+    // Handle changes to question data
+    const handleQuestionChange = (blockIndex, questionIndex, e) => {
+        const { name, value } = e.target;
+        const updatedBlocks = [...courseData.blocks];
+        updatedBlocks[blockIndex].test.questions[questionIndex] = {
+            ...updatedBlocks[blockIndex].test.questions[questionIndex],
+            [name]: value
+        };
+        setCourseData({ ...courseData, blocks: updatedBlocks });
     };
 
-    const toggleTest = (blockIndex) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex) {
-                    // Only toggle if not managed by DOCX upload, or provide clear logic
-                    // If using DOCX upload, maybe disable this button or change its function?
-                    // For now, it adds/removes an empty test structure manually.
-                    return {
-                        ...block,
-                        test: block.test ? null : { // Переключаем наличие теста
-                            questions: []
-                        }
-                    };
-                }
-                return block;
-            })
-        }));
-    };
-
+    // Add a new question
     const addQuestion = (blockIndex) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex && block.test) {
-                    return {
-                        ...block,
-                        test: {
-                            ...block.test,
-                            questions: [...block.test.questions, {
-                                title: '',
-                                explanation: '',
-                                answers: []
-                            }]
-                        }
-                    };
-                }
-                return block;
-            })
-        }));
+        const updatedBlocks = [...courseData.blocks];
+
+        // Если вопросов ещё нет, инициализируем массив
+        if (!updatedBlocks[blockIndex].test.questions) {
+            updatedBlocks[blockIndex].test.questions = [];
+        }
+
+        const newQuestion = {
+            title: '',
+            explanation: '',
+            answers: [
+                { title: '', isCorrect: true, explanation: '' },
+                { title: '', isCorrect: false, explanation: '' }
+            ]
+        };
+
+        updatedBlocks[blockIndex].test.questions.push(newQuestion);
+        setCourseData({ ...courseData, blocks: updatedBlocks });
     };
 
-    const updateQuestion = (blockIndex, questionIndex, field, value) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex && block.test) {
-                    return {
-                        ...block,
-                        test: {
-                            ...block.test,
-                            questions: block.test.questions.map((question, qIdx) => {
-                                if (qIdx === questionIndex) {
-                                    return {
-                                        ...question,
-                                        [field]: value
-                                    };
-                                }
-                                return question;
-                            })
-                        }
-                    };
-                }
-                return block;
-            })
-        }));
+    // Remove a question
+    const removeQuestion = (blockIndex, questionIndex) => {
+        const updatedBlocks = [...courseData.blocks];
+
+        if (updatedBlocks[blockIndex].test.questions.length > 1) {
+            updatedBlocks[blockIndex].test.questions.splice(questionIndex, 1);
+        } else {
+            // Если это последний вопрос, очищаем массив вопросов
+            updatedBlocks[blockIndex].test.questions = [];
+        }
+
+        setCourseData({ ...courseData, blocks: updatedBlocks });
     };
 
+    // Handle changes to answer data
+    const handleAnswerChange = (blockIndex, questionIndex, answerIndex, e) => {
+        const { name, value, type, checked } = e.target;
+        const updatedBlocks = [...courseData.blocks];
+        const answers = updatedBlocks[blockIndex].test.questions[questionIndex].answers;
+
+        answers[answerIndex] = {
+            ...answers[answerIndex],
+            [name]: type === 'checkbox' ? checked : value
+        };
+
+        // If this answer is marked correct, make others incorrect
+        if (name === 'isCorrect' && checked) {
+            answers.forEach((answer, idx) => {
+                if (idx !== answerIndex) answer.isCorrect = false;
+            });
+        }
+
+        setCourseData({ ...courseData, blocks: updatedBlocks });
+    };
+
+    // Add a new answer
     const addAnswer = (blockIndex, questionIndex) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex && block.test) {
-                    return {
-                        ...block,
-                        test: {
-                            ...block.test,
-                            questions: block.test.questions.map((question, qIdx) => {
-                                if (qIdx === questionIndex) {
-                                    return {
-                                        ...question,
-                                        answers: [...question.answers, {
-                                            title: '',
-                                            isCorrect: false,
-                                            explanation: ''
-                                        }]
-                                    };
-                                }
-                                return question;
-                            })
-                        }
-                    };
-                }
-                return block;
-            })
-        }));
+        const updatedBlocks = [...courseData.blocks];
+        updatedBlocks[blockIndex].test.questions[questionIndex].answers.push({
+            title: '',
+            isCorrect: false,
+            explanation: ''
+        });
+        setCourseData({ ...courseData, blocks: updatedBlocks });
     };
 
-    const updateAnswer = (blockIndex, questionIndex, answerIndex, field, value) => {
-        setCourse(prev => ({
-            ...prev,
-            blocks: prev.blocks.map((block, idx) => {
-                if (idx === blockIndex && block.test) {
-                    return {
-                        ...block,
-                        test: {
-                            ...block.test,
-                            questions: block.test.questions.map((question, qIdx) => {
-                                if (qIdx === questionIndex) {
-                                    return {
-                                        ...question,
-                                        answers: question.answers.map((answer, aIdx) => {
-                                            if (aIdx === answerIndex) {
-                                                // Handle checkbox toggling correctly even if `value` isn't passed
-                                                const val = field === 'isCorrect' ?
-                                                    (typeof value === 'boolean' ? value : !answer.isCorrect) :
-                                                    value;
-                                                return {
-                                                    ...answer,
-                                                    [field]: val
-                                                };
-                                            }
-                                            // Ensure only one answer is correct for radio-button style questions
-                                            // If this needs multi-select, remove the next line
-                                            // if (field === 'isCorrect' && val === true) {
-                                            //     return { ...answer, isCorrect: false };
-                                            // }
-                                            return answer;
-                                        })
-                                    };
-                                }
-                                return question;
-                            })
-                        }
-                    };
-                }
-                return block;
-            })
-        }));
+    // Remove an answer
+    const removeAnswer = (blockIndex, questionIndex, answerIndex) => {
+        const answers = courseData.blocks[blockIndex].test.questions[questionIndex].answers;
+        if (answers.length > 2) {
+            const updatedBlocks = [...courseData.blocks];
+            const isRemovingCorrect = answers[answerIndex].isCorrect;
+
+            updatedBlocks[blockIndex].test.questions[questionIndex].answers.splice(answerIndex, 1);
+
+            if (isRemovingCorrect) {
+                updatedBlocks[blockIndex].test.questions[questionIndex].answers[0].isCorrect = true;
+            }
+
+            setCourseData({ ...courseData, blocks: updatedBlocks });
+        } else {
+            toast.error('Вопрос должен содержать как минимум два варианта ответа');
+        }
     };
 
+    // Add a new lesson
+    const addLesson = (blockIndex) => {
+        const updatedBlocks = [...courseData.blocks];
+        updatedBlocks[blockIndex].lessons = updatedBlocks[blockIndex].lessons || [];
+        updatedBlocks[blockIndex].lessons.push({
+            title: '',
+            briefDescription: '',
+            description: '',
+            experience: 0
+        });
+        setCourseData({ ...courseData, blocks: updatedBlocks });
+    };
 
-    // --- Submit Handler ---
+    // Handle changes to lesson data
+    const handleLessonChange = (blockIndex, lessonIndex, e) => {
+        const { name, value, type } = e.target;
+        const updatedBlocks = [...courseData.blocks];
+        updatedBlocks[blockIndex].lessons[lessonIndex] = {
+            ...updatedBlocks[blockIndex].lessons[lessonIndex],
+            [name]: type === 'number' ? parseFloat(value) : value
+        };
+        setCourseData({ ...courseData, blocks: updatedBlocks });
+    };
+
+    // Remove a lesson
+    const removeLesson = (blockIndex, lessonIndex) => {
+        const updatedBlocks = [...courseData.blocks];
+        updatedBlocks[blockIndex].lessons.splice(lessonIndex, 1);
+        setCourseData({ ...courseData, blocks: updatedBlocks });
+    };
+
+    // Basic form validation
+    const validateForm = () => {
+        if (!courseData.title) return 'Заголовок курса обязателен';
+        if (!courseData.description) return 'Описание курса обязательно';
+        if (courseData.discount && courseData.priceWithDiscount >= courseData.price) {
+            return 'Цена со скидкой должна быть меньше основной цены';
+        }
+
+        // More validation checks could be added here
+
+        return null;
+    };
+
+    // Submit the form
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log("Submitting Course:", JSON.stringify(course, null, 2)); // Debugging: Check the final structure
+
+        const error = validateForm();
+        if (error) {
+            toast.error(error);
+            return;
+        }
+
         try {
-            // Filter blocks if needed (e.g., remove test: null) - Your existing logic is likely fine
-            const courseToSend = {
-                ...course,
-                blocks: course.blocks.map(block => {
-                    const { test, ...rest } = block;
-                    // Send 'test' only if it's not null and has questions
-                    return (test && test.questions && test.questions.length > 0) ? block : rest;
-                })
-            };
-
-            console.log("Sending Payload:", JSON.stringify(courseToSend, null, 2)); // Debugging: Check the payload
-
-            await axios.post(URL + '/api/courses', courseToSend);
-            alert('Курс успешно создан!');
-            navigate('/');
+            setLoading(true);
+            const response = await axios.post(URL+'/api/Courses', courseData);
+            toast.success('Курс успешно создан!');
+            console.log('Course created:', response.data);
         } catch (error) {
-            console.error("Ошибка при создании курса:", error.response?.data || error.message); // Log more details
-            alert(`Ошибка при создании курса: ${error.response?.data?.message || error.message}`);
+            console.error('Error creating course:', error);
+            toast.error(error.response?.data?.message || 'Ошибка при создании курса');
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <Container className="py-4">
-            <h2>Создание курса</h2>
-            <Form onSubmit={handleSubmit}>
-                {/* --- Course Details Form Groups (Title, URL, Descriptions, Price, etc.) --- */}
-                {/* (Keep your existing form groups for course details) */}
-                {/* Основная информация о курсе */}
-                <Row className="mb-4">
-                    <Col md={6}>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Название курса</Form.Label>
-                            <Form.Control
-                                name="title"
-                                value={course.title}
-                                onChange={handleChange}
-                                placeholder="Название"
-                                required
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>URL видео (превью)</Form.Label>
-                            <Form.Control
-                                name="urlVideo"
-                                value={course.urlVideo}
-                                onChange={handleChange}
-                                placeholder="https://example.com/video"
-                            />
-                        </Form.Group>
-                    </Col>
-                    <Col md={6}>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Краткое описание</Form.Label>
-                            <Form.Control
-                                name="briefDescription"
-                                value={course.briefDescription}
-                                onChange={handleChange}
-                                placeholder="Краткое описание"
-                                required
-                            />
-                        </Form.Group>
-                    </Col>
-                </Row>
+        <div className="container mt-4 mb-5">
+            <h1 className="mb-4">Создание нового курса</h1>
 
-                <Form.Group className="mb-3">
-                    <Form.Label>Полное описание</Form.Label>
-                    <Form.Control
-                        as="textarea"
-                        rows={3}
-                        name="description"
-                        value={course.description}
-                        onChange={handleChange}
-                        placeholder="Полное описание курса"
-                        required
-                    />
-                </Form.Group>
-
-                <Row className="mb-4">
-                    <Col md={4}>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Цена (в копейках/центах)</Form.Label>
-                            <Form.Control
-                                type="number"
-                                name="price"
-                                value={course.price}
-                                onChange={handleChange}
-                                required
-                            />
-                        </Form.Group>
-                    </Col>
-                    <Col md={4}>
-                        <Form.Group className="mb-3">
-                            <Form.Check
-                                type="checkbox"
-                                label="Есть скидка"
-                                name="discount"
-                                checked={course.discount}
-                                onChange={handleChange}
-                            />
-                        </Form.Group>
-                    </Col>
-                    {course.discount && (
-                        <Col md={4}>
-                            <Form.Group className="mb-3">
-                                <Form.Label>Цена со скидкой</Form.Label>
-                                <Form.Control
-                                    type="number"
-                                    name="priceWithDiscount"
-                                    value={course.priceWithDiscount}
-                                    onChange={handleChange}
-                                    required={course.discount}
+            <form onSubmit={handleSubmit}>
+                {/* Course Basic Information */}
+                <div className="card mb-4">
+                    <div className="card-header bg-primary text-white">
+                        <h5 className="mb-0">Основная информация</h5>
+                    </div>
+                    <div className="card-body">
+                        <div className="row mb-3">
+                            <div className="col-md-6">
+                                <label className="form-label">Название курса *</label>
+                                <input
+                                    type="text"
+                                    name="title"
+                                    value={courseData.title}
+                                    onChange={handleCourseChange}
+                                    className="form-control"
+                                    required
                                 />
-                            </Form.Group>
-                        </Col>
-                    )}
-                </Row>
-
-
-                {/* --- Blocks Section --- */}
-                <h4 className="mt-4">Блоки курса</h4>
-                {course.blocks.map((block, blockIdx) => (
-                    <Card key={blockIdx} className="mb-3 p-3">
-                        <Form.Group className="mb-3">
-                            <Form.Label>Название блока {blockIdx + 1}</Form.Label>
-                            <Form.Control
-                                value={block.title}
-                                onChange={(e) => updateBlockTitle(blockIdx, e.target.value)}
-                                placeholder={`Название блока ${blockIdx + 1}`}
-                                required
-                            />
-                        </Form.Group>
-
-                        {/* --- Action Buttons for the Block --- */}
-                        <div className="d-flex justify-content-between align-items-center mb-3">
-                            <div>
-                                <Button
-                                    variant="outline-primary"
-                                    size="sm"
-                                    onClick={() => addLesson(blockIdx)}
-                                    className="me-2"
-                                >
-                                    Добавить урок вручную
-                                </Button>
-                                <Button
-                                    variant={block.test ? "warning" : "outline-secondary"}
-                                    size="sm"
-                                    onClick={() => toggleTest(blockIdx)}
-                                    className="me-2"
-                                    title={block.test ? "Удалить тест (или замените загрузкой)" : "Добавить пустой тест"}
-                                >
-                                    {block.test ? "Удалить/Заменить тест" : "Добавить тест вручную"}
-                                </Button>
                             </div>
-                            {/* --- Upload Button --- */}
-                            <Button
-                                variant="info"
-                                size="sm"
-                                onClick={() => handleShowUploadModal(blockIdx)}
-                            >
-                                Загрузить уроки/тест из DOCX
-                            </Button>
+
+                            <div className="col-md-6">
+                                <label className="form-label">Краткое описание *</label>
+                                <input
+                                    type="text"
+                                    name="briefDescription"
+                                    value={courseData.briefDescription}
+                                    onChange={handleCourseChange}
+                                    className="form-control"
+                                    required
+                                />
+                            </div>
+
                         </div>
 
+                        <div className="mb-3">
+                            <label className="form-label">Полное описание *</label>
+                            <textarea
+                                name="description"
+                                value={courseData.description}
+                                onChange={handleCourseChange}
+                                className="form-control"
+                                rows="3"
+                                required
+                            />
+                        </div>
 
-                        {/* --- Lessons in Block --- */}
-                        {block.lessons.length > 0 && (
-                            <>
-                                <h5>Уроки блока</h5>
-                                {block.lessons.map((lesson, lessonIdx) => (
-                                    // Keep your existing Lesson Card rendering here
-                                    // ... lesson card JSX ...
-                                    <Card key={lessonIdx} className="mb-2 p-2 bg-light">
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Название урока {lessonIdx + 1}</Form.Label>
-                                            <Form.Control
-                                                value={lesson.title}
-                                                onChange={(e) => updateLesson(blockIdx, lessonIdx, 'title', e.target.value)}
-                                                required
-                                            />
-                                        </Form.Group>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Краткое описание</Form.Label>
-                                            <Form.Control
-                                                value={lesson.briefDescription}
-                                                onChange={(e) => updateLesson(blockIdx, lessonIdx, 'briefDescription', e.target.value)}
-                                            />
-                                        </Form.Group>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Полное описание</Form.Label>
-                                            <Form.Control
-                                                as="textarea"
-                                                rows={2}
-                                                value={lesson.description}
-                                                onChange={(e) => updateLesson(blockIdx, lessonIdx, 'description', e.target.value)}
-                                            />
-                                        </Form.Group>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>URL видео урока</Form.Label>
-                                            <Form.Control
-                                                value={lesson.urlVideo}
-                                                onChange={(e) => updateLesson(blockIdx, lessonIdx, 'urlVideo', e.target.value)}
-                                            />
-                                        </Form.Group>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Опыт (XP)</Form.Label>
-                                            <Form.Control
-                                                type="number"
-                                                value={lesson.experience}
-                                                onChange={(e) => updateLesson(blockIdx, lessonIdx, 'experience', e.target.value)}
-                                                required
-                                            />
-                                        </Form.Group>
-                                    </Card>
-                                ))}
-                            </>
-                        )}
-
-                        {/* --- Test in Block --- */}
-                        {block.test && block.test.questions && block.test.questions.length > 0 && (
-                            <>
-                                <h5 className="mt-3">Тест блока</h5>
-                                <Button
-                                    variant="outline-success"
-                                    size="sm"
-                                    className="mb-3"
-                                    onClick={() => addQuestion(blockIdx)}
-                                >
-                                    Добавить вопрос вручную
-                                </Button>
-
-                                {block.test.questions.map((question, questionIdx) => (
-                                    // Keep your existing Question/Answer Card rendering here
-                                    // ... question/answer card JSX ...
-                                    <Card key={questionIdx} className="mb-3 p-3 bg-light">
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Вопрос {questionIdx + 1}</Form.Label>
-                                            <Form.Control
-                                                value={question.title}
-                                                onChange={(e) => updateQuestion(blockIdx, questionIdx, 'title', e.target.value)}
-                                                required
-                                            />
-                                        </Form.Group>
-                                        <Form.Group className="mb-2">
-                                            <Form.Label>Объяснение (для вопроса)</Form.Label>
-                                            <Form.Control
-                                                as="textarea"
-                                                rows={2}
-                                                value={question.explanation}
-                                                onChange={(e) => updateQuestion(blockIdx, questionIdx, 'explanation', e.target.value)}
-                                            />
-                                        </Form.Group>
-
-                                        <Button
-                                            variant="outline-info"
-                                            size="sm"
-                                            className="mb-2"
-                                            onClick={() => addAnswer(blockIdx, questionIdx)}
-                                        >
-                                            Добавить вариант ответа вручную
-                                        </Button>
-
-                                        {question.answers.map((answer, answerIdx) => (
-                                            <Card key={answerIdx} className="mb-2 p-2">
-                                                <Form.Group className="mb-2">
-                                                    <Form.Label>Вариант ответа {answerIdx + 1}</Form.Label>
-                                                    <Form.Control
-                                                        value={answer.title}
-                                                        onChange={(e) => updateAnswer(blockIdx, questionIdx, answerIdx, 'title', e.target.value)}
-                                                        required
-                                                    />
-                                                </Form.Group>
-                                                <Form.Group className="mb-2 d-flex align-items-center">
-                                                    <Form.Check
-                                                        type="checkbox" // Using checkbox to allow toggling
-                                                        label="Правильный ответ"
-                                                        checked={answer.isCorrect}
-                                                        onChange={() => updateAnswer(blockIdx, questionIdx, answerIdx, 'isCorrect')}
-                                                    />
-                                                </Form.Group>
-                                                <Form.Group className="mb-2">
-                                                    <Form.Label>Объяснение (для ответа)</Form.Label>
-                                                    <Form.Control
-                                                        as="textarea"
-                                                        rows={1}
-                                                        value={answer.explanation}
-                                                        onChange={(e) => updateAnswer(blockIdx, questionIdx, answerIdx, 'explanation', e.target.value)}
-                                                    />
-                                                </Form.Group>
-                                            </Card>
-                                        ))}
-                                    </Card>
-                                ))}
-                            </>
-                        )}
-                        {/* Display message if block has no lessons/test yet */}
-                        {block.lessons.length === 0 && (!block.test || !block.test.questions || block.test.questions.length === 0) && (
-                            <p className="text-muted">Добавьте уроки и/или тест вручную или загрузите из файла DOCX.</p>
-                        )}
-                    </Card>
-                ))}
-
-                {/* --- Add Block / Submit Buttons --- */}
-                <div className="d-flex justify-content-between mt-4">
-                    <Button variant="primary" onClick={addBlock}>Добавить блок</Button>
-                    <Button type="submit" variant="success">Создать курс</Button>
+                        <div className="row">
+                            <div className="col-md-4">
+                                <label className="form-label">Цена (руб.) *</label>
+                                <input
+                                    type="number"
+                                    name="price"
+                                    value={courseData.price}
+                                    onChange={handleCourseChange}
+                                    className="form-control"
+                                    min="0"
+                                    required
+                                />
+                            </div>
+                            <div className="col-md-4 d-flex align-items-center">
+                                <div className="form-check mt-4">
+                                    <input
+                                        type="checkbox"
+                                        name="discount"
+                                        checked={courseData.discount}
+                                        onChange={handleCourseChange}
+                                        className="form-check-input"
+                                        id="discountCheckbox"
+                                    />
+                                    <label className="form-check-label" htmlFor="discountCheckbox">
+                                        Применить скидку
+                                    </label>
+                                </div>
+                            </div>
+                            {courseData.discount && (
+                                <div className="col-md-4">
+                                    <label className="form-label">Цена со скидкой (руб.) *</label>
+                                    <input
+                                        type="number"
+                                        name="priceWithDiscount"
+                                        value={courseData.priceWithDiscount}
+                                        onChange={handleCourseChange}
+                                        className="form-control"
+                                        min="0"
+                                        max={courseData.price}
+                                        required
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
-            </Form>
 
-            {/* --- Upload Modal --- */}
-            {targetBlockIndex !== null && (
-                <BlockContentUploader
-                    show={showUploadModal}
-                    handleClose={handleCloseUploadModal}
-                    blockIndex={targetBlockIndex}
-                    onUploadComplete={handleContentUpload} // Pass the callback
-                />
-            )}
-        </Container>
+                {/* Course Blocks */}
+                <div className="mb-4">
+                    <div className="d-flex justify-content-between align-items-center mb-3">
+                        <h3>Блоки курса</h3>
+                        <button
+                            type="button"
+                            onClick={addBlock}
+                            className="btn btn-success"
+                        >
+                            Добавить блок
+                        </button>
+                    </div>
+
+                    {courseData.blocks.map((block, blockIndex) => (
+                        <div key={blockIndex} className="card mb-4">
+                            <div className="card-header d-flex justify-content-between align-items-center bg-light">
+                                <h5 className="mb-0">Блок {block.numberOfBLock}</h5>
+                                <button
+                                    type="button"
+                                    onClick={() => removeBlock(blockIndex)}
+                                    className="btn btn-sm btn-outline-danger"
+                                >
+                                    Удалить блок
+                                </button>
+                            </div>
+                            <div className="card-body">
+                                <div className="mb-3">
+                                    <label className="form-label">Название блока *</label>
+                                    <input
+                                        type="text"
+                                        name="title"
+                                        value={block.title}
+                                        onChange={(e) => handleBlockChange(blockIndex, e)}
+                                        className="form-control"
+                                        required
+                                    />
+                                </div>
+
+                                {/* Block Tests */}
+                                <div className="mb-4">
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <h5>Тест для блока (необязательно)</h5>
+                                        <button
+                                            type="button"
+                                            onClick={() => addQuestion(blockIndex)}
+                                            className="btn btn-sm btn-primary"
+                                        >
+                                            {hasTestQuestions(blockIndex) ? 'Добавить вопрос' : 'Добавить тест'}
+                                        </button>
+                                    </div>
+
+                                    {hasTestQuestions(blockIndex) ? (
+                                        block.test.questions.map((question, questionIndex) => (
+                                            <div key={questionIndex} className="card mb-3 bg-light">
+                                                <div className="card-header d-flex justify-content-between align-items-center">
+                                                    <h6 className="mb-0">Вопрос {questionIndex + 1}</h6>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeQuestion(blockIndex, questionIndex)}
+                                                        className="btn btn-sm btn-outline-danger"
+                                                    >
+                                                        Удалить вопрос
+                                                    </button>
+                                                </div>
+                                                <div className="card-body">
+                                                    <div className="mb-3">
+                                                        <label className="form-label">Текст вопроса *</label>
+                                                        <input
+                                                            type="text"
+                                                            name="title"
+                                                            value={question.title}
+                                                            onChange={(e) => handleQuestionChange(blockIndex, questionIndex, e)}
+                                                            className="form-control"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                    <div className="mb-3">
+                                                        <label className="form-label">Пояснение к вопросу</label>
+                                                        <input
+                                                            type="text"
+                                                            name="explanation"
+                                                            value={question.explanation}
+                                                            onChange={(e) => handleQuestionChange(blockIndex, questionIndex, e)}
+                                                            className="form-control"
+                                                        />
+                                                    </div>
+
+                                                    <div className="mt-3">
+                                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                                            <h6>Варианты ответов</h6>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => addAnswer(blockIndex, questionIndex)}
+                                                                className="btn btn-sm btn-secondary"
+                                                            >
+                                                                Добавить ответ
+                                                            </button>
+                                                        </div>
+
+                                                        {question.answers.map((answer, answerIndex) => (
+                                                            <div key={answerIndex} className="card mb-2">
+                                                                <div className="card-body">
+                                                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                                                        <div className="form-check">
+                                                                            <input
+                                                                                type="checkbox"
+                                                                                name="isCorrect"
+                                                                                checked={answer.isCorrect}
+                                                                                onChange={(e) => handleAnswerChange(blockIndex, questionIndex, answerIndex, e)}
+                                                                                className="form-check-input"
+                                                                                id={`correct-${blockIndex}-${questionIndex}-${answerIndex}`}
+                                                                            />
+                                                                            <label className="form-check-label" htmlFor={`correct-${blockIndex}-${questionIndex}-${answerIndex}`}>
+                                                                                Правильный ответ
+                                                                            </label>
+                                                                        </div>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeAnswer(blockIndex, questionIndex, answerIndex)}
+                                                                            className="btn btn-sm btn-outline-danger"
+                                                                        >
+                                                                            Удалить
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <div className="mb-2">
+                                                                        <label className="form-label">Текст ответа *</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            name="title"
+                                                                            value={answer.title}
+                                                                            onChange={(e) => handleAnswerChange(blockIndex, questionIndex, answerIndex, e)}
+                                                                            className="form-control"
+                                                                            required
+                                                                        />
+                                                                    </div>
+
+                                                                    <div>
+                                                                        <label className="form-label">Пояснение к ответу</label>
+                                                                        <input
+                                                                            type="text"
+                                                                            name="explanation"
+                                                                            value={answer.explanation}
+                                                                            onChange={(e) => handleAnswerChange(blockIndex, questionIndex, answerIndex, e)}
+                                                                            className="form-control"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="alert alert-light">
+                                            <p className="text-muted mb-0">Тест для этого блока не добавлен. Нажмите "Добавить тест", чтобы создать тест.</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Block Lessons */}
+                                <div>
+                                    <div className="d-flex justify-content-between align-items-center mb-2">
+                                        <h5>Уроки блока</h5>
+                                        <button
+                                            type="button"
+                                            onClick={() => addLesson(blockIndex)}
+                                            className="btn btn-sm btn-primary"
+                                        >
+                                            Добавить урок
+                                        </button>
+                                    </div>
+
+                                    {block.lessons && block.lessons.map((lesson, lessonIndex) => (
+                                        <div key={lessonIndex} className="card mb-3 bg-light">
+                                            <div className="card-header d-flex justify-content-between align-items-center">
+                                                <h6 className="mb-0">Урок {lessonIndex + 1}</h6>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeLesson(blockIndex, lessonIndex)}
+                                                    className="btn btn-sm btn-outline-danger"
+                                                >
+                                                    Удалить урок
+                                                </button>
+                                            </div>
+                                            <div className="card-body">
+                                                <div className="row mb-3">
+                                                    <div className="col-md-6">
+                                                        <label className="form-label">Название урока *</label>
+                                                        <input
+                                                            type="text"
+                                                            name="title"
+                                                            value={lesson.title}
+                                                            onChange={(e) => handleLessonChange(blockIndex, lessonIndex, e)}
+                                                            className="form-control"
+                                                            required
+                                                        />
+                                                    </div>
+
+                                                </div>
+
+                                                <div className="row mb-3">
+                                                    <div className="col-md-6">
+                                                        <label className="form-label">Краткое описание</label>
+                                                        <input
+                                                            type="text"
+                                                            name="briefDescription"
+                                                            value={lesson.briefDescription}
+                                                            onChange={(e) => handleLessonChange(blockIndex, lessonIndex, e)}
+                                                            className="form-control"
+                                                        />
+                                                    </div>
+                                                    <div className="col-md-6">
+                                                        <label className="form-label">Опыт за урок</label>
+                                                        <input
+                                                            type="number"
+                                                            name="experience"
+                                                            value={lesson.experience}
+                                                            onChange={(e) => handleLessonChange(blockIndex, lessonIndex, e)}
+                                                            className="form-control"
+                                                            min="0"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <HtmlEditor
+                                                        label="Описание урока (HTML) *"
+                                                        value={lesson.description}
+                                                        onChange={(htmlContent) => {
+                                                            const e = { target: { name: 'description', value: htmlContent } };
+                                                            handleLessonChange(blockIndex, lessonIndex, e);
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Submit Button */}
+                <div className="d-flex justify-content-end">
+                    <button
+                        type="submit"
+                        className="btn btn-lg btn-primary"
+                        disabled={loading}
+                    >
+                        {loading ? 'Создание...' : 'Создать курс'}
+                    </button>
+                </div>
+            </form>
+        </div>
     );
-}
+};
 
 export default CreateCourse;

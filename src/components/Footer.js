@@ -7,7 +7,7 @@ export default function Footer() {
                 <div className="row gy-4">
                     {/* О компании */}
                     <div className="col-lg-5 col-md-12">
-                        <a href="/" className="d-flex align-items-center mb-3 text-light text-decoration-none">
+                        <a href="/pudge/public" className="d-flex align-items-center mb-3 text-light text-decoration-none">
                             <h2 className="sitename text-success m-0">Pudge</h2>
                         </a>
                         <p className="text-muted">

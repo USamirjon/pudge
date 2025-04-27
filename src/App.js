@@ -1,18 +1,15 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Header from './Header';
+import Header from './components/Header';
 import './App.css'
-import {Signup,Login} from './signup';
-import Home from './Home';
+// Assuming 'Login' is correctly exported from './signup'
+import { Login } from './signup';
+import Home from './pages/Home';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Profile from './Profile';
-import Footer from './Footer';
-import JavaScriptPage from './PL/JavaScriptPage'; // Create separate page components
-import CSharpPage from './PL/CSharpPage';
-import PythonPage from './PL/PythonPage';
-import api from "./api";
-import Testpass from "./testpass";
-import Testcreator from "./testcreator";
-
+import Footer from './components/Footer';
+import Courses from "./pages/Courses";
+import CreateCourse from "./pages/CreateCourse"; // This component now handles uploads via modal
+import GiveData from "./pages/GiveData";
+// No need to import BlockContentUploader here anymore, as it's used internally by CreateCourse
 
 function App() {
     return (
@@ -21,15 +18,13 @@ function App() {
                 <Header/>
                 <Routes>
                     <Route path="/" element={<Home/>}/>
-                    <Route path="/Signup" element={<Signup/>}/>
                     <Route path="/Login" element={<Login/>}/>
-                    <Route path="/Profile" element={<Profile/>}/>
-                    <Route path="/javascript" element={<JavaScriptPage />} />
-                    <Route path="/csharp" element={<CSharpPage />} />
-                    <Route path="/python" element={<PythonPage />} />
-                    <Route path="/testpass" element={<Testpass />} />
-                    <Route path="/testcreator" element={<Testcreator />} />
-
+                    <Route path="/courses" element={<Courses />} />
+                    {/* The CreateCourse component handles uploads internally */}
+                    <Route path="/createcourse" element={<CreateCourse />} />
+                    <Route path="/givedata" element={<GiveData />} />
+                    {/* The standalone upload route is removed because functionality is modal-based */}
+                    {/* <Route path="/upload-files" element={<UploadFiles />} /> REMOVED */}
                 </Routes>
                 <br/>
                 <Footer/>

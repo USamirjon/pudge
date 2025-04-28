@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import HtmlEditor from './HtmlEditor';
+import TestUploader from './TestUploader';
 import {URL} from '../domain.ts';
 
 const CreateCourse = () => {
@@ -109,6 +110,25 @@ const CreateCourse = () => {
 
         updatedBlocks[blockIndex].test.questions.push(newQuestion);
         setCourseData({ ...courseData, blocks: updatedBlocks });
+    };
+
+    // Import questions from DOCX
+    const handleQuestionsImported = (blockIndex, questions) => {
+        const updatedBlocks = [...courseData.blocks];
+
+        // Initialize test questions array if needed
+        if (!updatedBlocks[blockIndex].test) {
+            updatedBlocks[blockIndex].test = { questions: [] };
+        }
+
+        // Add imported questions to existing ones
+        updatedBlocks[blockIndex].test.questions = [
+            ...updatedBlocks[blockIndex].test.questions,
+            ...questions
+        ];
+
+        setCourseData({ ...courseData, blocks: updatedBlocks });
+        toast.success(`Импортировано ${questions.length} вопросов`);
     };
 
     // Remove a question
@@ -220,6 +240,24 @@ const CreateCourse = () => {
         return null;
     };
 
+    // Prepare data for submission by removing empty test objects
+    const prepareDataForSubmission = () => {
+        // Create a deep copy of courseData to avoid mutating the state
+        const processedData = JSON.parse(JSON.stringify(courseData));
+
+        // Process each block
+        processedData.blocks = processedData.blocks.map(block => {
+            // If the block has no test questions, remove the test property
+            if (!block.test || !block.test.questions || block.test.questions.length === 0) {
+                const { test, ...blockWithoutTest } = block;
+                return blockWithoutTest;
+            }
+            return block;
+        });
+
+        return processedData;
+    };
+
     // Submit the form
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -230,9 +268,12 @@ const CreateCourse = () => {
             return;
         }
 
+        // Prepare data by removing empty tests
+        const dataToSubmit = prepareDataForSubmission();
+
         try {
             setLoading(true);
-            const response = await axios.post(URL+'/api/Courses', courseData);
+            const response = await axios.post(URL+'/api/Courses', dataToSubmit);
             toast.success('Курс успешно создан!');
             console.log('Course created:', response.data);
         } catch (error) {
@@ -382,13 +423,19 @@ const CreateCourse = () => {
                                 <div className="mb-4">
                                     <div className="d-flex justify-content-between align-items-center mb-2">
                                         <h5>Тест для блока (необязательно)</h5>
-                                        <button
-                                            type="button"
-                                            onClick={() => addQuestion(blockIndex)}
-                                            className="btn btn-sm btn-primary"
-                                        >
-                                            {hasTestQuestions(blockIndex) ? 'Добавить вопрос' : 'Добавить тест'}
-                                        </button>
+                                        <div className="d-flex">
+                                            <TestUploader
+                                                blockIndex={blockIndex}
+                                                onQuestionsImported={handleQuestionsImported}
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => addQuestion(blockIndex)}
+                                                className="btn btn-sm btn-primary ms-2"
+                                            >
+                                                {hasTestQuestions(blockIndex) ? 'Добавить вопрос' : 'Добавить тест'}
+                                            </button>
+                                        </div>
                                     </div>
 
                                     {hasTestQuestions(blockIndex) ? (
@@ -497,7 +544,7 @@ const CreateCourse = () => {
                                         ))
                                     ) : (
                                         <div className="alert alert-light">
-                                            <p className="text-muted mb-0">Тест для этого блока не добавлен. Нажмите "Добавить тест", чтобы создать тест.</p>
+                                            <p className="text-muted mb-0">Тест для этого блока не добавлен. Нажмите "Добавить тест", чтобы создать тест вручную, или используйте "Импорт теста из DOCX" для импорта теста из документа.</p>
                                         </div>
                                     )}
                                 </div>

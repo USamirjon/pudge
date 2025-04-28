@@ -1,6 +1,6 @@
 import React from 'react';
 
-function Courses() {
+function Support() {
     return (
         <div className="container">
 
@@ -8,4 +8,4 @@ function Courses() {
     );
 }
 
-export default Courses;
+export default Support;

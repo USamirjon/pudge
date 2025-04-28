@@ -12,7 +12,7 @@ function Header() {
                     <Nav className="ms-auto">
                         <Nav.Link href="/">Home</Nav.Link>
                         <Nav.Link href="#about">About</Nav.Link>
-                        <NavDropdown title="Courses" id="basic-nav-dropdown">
+                        <NavDropdown title="Support" id="basic-nav-dropdown">
                             <NavDropdown.Item href="javascript">Js</NavDropdown.Item>
                             <NavDropdown.Item href="csharp">C#</NavDropdown.Item>
                             <NavDropdown.Item href="python">Python</NavDropdown.Item>

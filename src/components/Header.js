@@ -6,11 +6,11 @@ function Header() {
     return (
         <Navbar bg="light" expand="lg" fixed="top" className="shadow-sm">
             <Container>
-                <Navbar.Brand href="/" className="fw-bold fs-4">Pudge</Navbar.Brand>
+                <Navbar.Brand href="/home" className="fw-bold fs-4">Pudge</Navbar.Brand>
                 <Navbar.Toggle aria-controls="basic-navbar-nav" />
                 <Navbar.Collapse id="basic-navbar-nav">
                     <Nav className="ms-auto">
-                        <Nav.Link href="/">Home</Nav.Link>
+                        <Nav.Link href="/home">Home</Nav.Link>
                         <Nav.Link href="#about">About</Nav.Link>
                         <NavDropdown title="Support" id="basic-nav-dropdown">
                             <NavDropdown.Item href="javascript">Js</NavDropdown.Item>

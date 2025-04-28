@@ -8,12 +8,12 @@ function Home() {
                 <h2 className="text-center mb-5">Панель администратора</h2>
                 <div className="row g-4">
                     <div className="col-lg-4">
-                        <Link to="/courses" className="card text-center shadow border-0 p-4 text-decoration-none">
+                        <Link to="/support" className="card text-center shadow border-0 p-4 text-decoration-none">
                             <div className="mb-3">
                                 <i className="bi bi-journal-text fs-1 text-primary"></i>
                             </div>
-                            <h4 className="text-dark">Все курсы</h4>
-                            <p className="text-muted">Просмотрите и управляйте всеми доступными курсами.</p>
+                            <h4 className="text-dark">Support</h4>
+                            <p className="text-muted">Просмотрите и управляйте всеми заявками.</p>
                         </Link>
                     </div>
 

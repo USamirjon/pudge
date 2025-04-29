@@ -6,7 +6,6 @@ import './App.css';
 import Login from './pages/Login';
 import Home from './pages/Home';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import Footer from './components/Footer';
 import Support from './pages/Support';
 import CreateCourse from './pages/CreateCourse';
 import GiveData from './pages/GiveData';
@@ -36,7 +35,6 @@ function App() {
                 <Route path="/givedata" element={<GiveData />} />
             </Routes>
             <br />
-            <Footer />
         </div>
     );
 }
